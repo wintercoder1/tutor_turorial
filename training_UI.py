@@ -1,77 +1,34 @@
-import os
-import json
 import streamlit as st
+from slides import Slide, SlideDeck
+import json
 from openai import OpenAI
-from llama_index.core import load_index_from_storage
-from llama_index.core import StorageContext
-from llama_index.core.memory import ChatMemoryBuffer
-from llama_index.core.tools import QueryEngineTool, ToolMetadata
-from llama_index.agent.openai import OpenAIAgent
-from llama_index.core.storage.chat_store import SimpleChatStore
-from global_settings import INDEX_STORAGE, CONVERSATION_FILE
+from pathlib import Path
+from conversation_engine import initialize_chatbot, chat_interface, load_chat_store
 
-def load_chat_store():
-    try:
-        chat_store = SimpleChatStore.from_persist_path(
-            CONVERSATION_FILE
-        )
-    except FileExistsError:
-        chat_store = SimpleChatStore()
-    return chat_store
+def show_training_UI(user_name, study_subject):
+    # Load the slide deck
+    slide_deck = SlideDeck.load_from_file("cache/slides.json")
+    
+    # Display title and slide navigation controls
+    st.sidebar.markdown("## " + slide_deck.topic)
+    current_slide_index = st.sidebar.number_input("Slide Number", min_value=0, max_value=len(slide_deck.slides)-1, value=0, step=1)
+    current_slide = slide_deck.slides[current_slide_index]
+    if st.sidebar.button("Toggle narration"):
+            st.session_state.show_narration = not st.session_state.get('show_narration', False)
 
-def display_messages(chat_store, container):
-    with container:
-        for message in chat_store.get_messages(key="0"):
-            with st.chat_message(message.role):
-                st.markdown(message.content)
+    # Displaying slides and narration in the main area
+    col1, col2 = st.columns([0.7,0.3],gap="medium")
+    with col1:
+        st.markdown(current_slide.render(display_narration=st.session_state.get('show_narration', False)), unsafe_allow_html=True)
 
-def initialize_chatbot(user_name, study_subject, chat_store, container, context):
-    memory = ChatMemoryBuffer.from_defaults(
-        token_limit=3000,
-        chat_store=chat_store,
-        chat_store_key="0"
-    )
-    storge_context = StorageContext.from_defaults(
-        persist_dir=INDEX_STORAGE
-    )
-    index = load_index_from_storage(
-        storge_context, index_id="vector"
-    )
-    study_materials_engine = index.as_chat_engine(
-        similarity_top_k=3
-    )
-    study_materials_tool = QueryEngineTool(
-        query_engine=study_materials_engine,
-        metadata=ToolMetadata(
-            name="study_materials",
-            description=(
-                f"Provides official onformation about"
-                f"{study_subject}. Use a detailed plain "
-                f"text question as input to the tool."
-            ),
-        )
-    )
-    agent = OpenAIAgent.from_tools(
-        tools=[study_materials_tool],
-        memory=memory,
-        system_prompt=(
-            f"Your name is PITS, a personal tutor. Your "
-            f"purpose is to help {user_name} study and "
-            f"better understand the topic of: "
-            f"{study_subject}. We are now discussing the "
-            f"slide with the following content: {context}"
-        )
-    )
-    display_messages(chat_store, container)
-    return agent
-
-def chat_interface(agent, chat_store, container):
-    prompt = st.chat_input("Type your question here.")
-    if prompt:
-        with container:
-            with st.chat_message("user"):
-                st.markdown(prompt)
-            response = str(agent.chat(prompt))
-            with st.chat_message("assistant"):
-                st.markdown(response)
-        chat_store.persist(CONVERSATION_FILE)
+    # Chatbot integration in the sidebar
+    with col2:
+        st.header("💬 P.I.T.S. Chatbot")
+        st.success(f"Hello {user_name}. I'm here to answer questions about {study_subject}")
+        #with st.spinner("Preparing the chatbot..."):
+        chat_store = load_chat_store()
+        container = st.container(height=600)
+        context = current_slide.render(display_narration=False)
+        agent = initialize_chatbot(user_name, study_subject, chat_store, container, context)
+        chat_interface(agent, chat_store, container)
+        

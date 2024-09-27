@@ -1,5 +1,5 @@
 from llama_index.core import load_index_from_storage, StorageContext
-from llama_index.core.program import DFRowsProgram
+from llama_index.program.evaporate.df import DFRowsProgram
 from llama_index.program.openai import OpenAIPydanticProgram
 from global_settings import INDEX_STORAGE, QUIZ_SIZE, QUIZ_FILE
 import pandas as pd
