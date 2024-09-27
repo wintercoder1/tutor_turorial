@@ -1,6 +1,6 @@
 from global_settings import STORAGE_PATH, CACHE_FILE
 from logging_functions import log_action
-from llama_index import SimpleDirectoryReader, VectorStoreIndex
+from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
 from llama_index.core.ingestion import IngestionPipeline, IngestionCache
 from llama_index.core.node_parser import TokenTextSplitter
 from llama_index.core.extractors import SummaryExtractor
